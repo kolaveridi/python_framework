@@ -8,3 +8,8 @@ def home (request,response):
 @app.route("/about")    
 def about(request,response):
     response.text ='Hello from about function'    
+    
+@app.route("/hello/{name}")
+def greeting(request, response, name):
+    response.text = f"Hello, {name}"    
+    

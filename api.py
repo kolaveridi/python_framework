@@ -1,6 +1,8 @@
 from webob import Request,Response
+from parse import parse
 import colorama
 colorama.init()
+
 class API:
     def __init__(self):
         self.routes={}
@@ -25,21 +27,26 @@ class API:
         response.status_code = 404
         response.text = "Not found."
         
-        
+    
+    def find_handler(self,request_path):
+        for path,handler in self.routes.items():
+            parse_result = parse(path,request_path)
+            if parse_result is not None:
+                return handler,parse_result.named
+            
+        return None,None    
+            
     
     def handle_request(self,request):
         response =Response()
         print(colorama.Fore.RED,"routes are ",self.routes.items())
-        #iteratute through a dictionary using .items() and get values
+        handler,kwargs = self.find_handler(request_path=request.path)
+        if handler is not None:
+            handler(request,response ,**kwargs)
+        else:
+            self.default_response(response)       
+        return response     
+            
         
-        for path,handler in self.routes.items():
-            print(colorama.Fore.BLUE,path,handler)
-            if path == request.path:
-                print(colorama.Fore.YELLOW,"path is ",path,handler)
-                handler(request,response)
-                print(colorama.Fore.CYAN,"response ",response)
-                return response
-            self.default_response(response)
-            return response
         
     
