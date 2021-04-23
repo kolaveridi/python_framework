@@ -1,5 +1,6 @@
 from webob import Request,Response
 from parse import parse
+import inspect
 import colorama
 colorama.init()
 
@@ -8,6 +9,8 @@ class API:
         self.routes={}
     
     def route(self,path):
+        if path in self.routes :
+            raise AssertionError('Such route already exists')
         def wrapper(handler):
             self.routes[path] =handler
             print(colorama.Fore.GREEN,"handler check",handler)
@@ -39,10 +42,18 @@ class API:
     
     def handle_request(self,request):
         response =Response()
-        print(colorama.Fore.RED,"routes are ",self.routes.items())
+        print(colorama.Fore.RED,"request is  ",request)
+        
         handler,kwargs = self.find_handler(request_path=request.path)
         if handler is not None:
-            handler(request,response ,**kwargs)
+            if inspect.isclass(handler):
+                handler_funtion = getattr(handler(),request.method.lower(),None)
+                if handler_funtion is None:
+                    raise AttributeError('Method is not allowed ',request.method.lower())
+                handler_funtion(request,response,**kwargs)
+                pass
+            else:
+                handler(request,response ,**kwargs)
         else:
             self.default_response(response)       
         return response     
