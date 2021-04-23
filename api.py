@@ -2,6 +2,7 @@ from webob import Request,Response
 from parse import parse
 import inspect
 import colorama
+from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 colorama.init()
 
 class API:
@@ -16,6 +17,12 @@ class API:
             print(colorama.Fore.GREEN,"handler check",handler)
             return handler
         return wrapper
+    
+    def add_route(self,path,handler):
+        if path in self.routes:
+            raise AssertionError('Such route already exists')
+        self.routes[path] =handler
+        
         
         
     def __call__(self, environ, start_response):
@@ -56,7 +63,13 @@ class API:
                 handler(request,response ,**kwargs)
         else:
             self.default_response(response)       
-        return response     
+        return response   
+    
+    #test part
+    def test_session(self, base_url="http://testserver"):
+        session = RequestsSession()
+        session.mount(prefix=base_url, adapter=RequestsWSGIAdapter(self))
+        return session  
             
         
         
