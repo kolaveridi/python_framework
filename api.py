@@ -6,7 +6,7 @@ from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 import os
 from jinja2 import Environment, FileSystemLoader
 from whitenoise import WhiteNoise
-
+from middleware import Middleware
 colorama.init()
 
 class API:
@@ -15,9 +15,12 @@ class API:
         self.exception_handler =None
         self.templates_env = Environment(loader =FileSystemLoader(os.path.abspath(templates_dir)))
         self.whitenoise = WhiteNoise(self.wsgi_app, root=static_dir)
+        self.middleware = Middleware(self)
         
         
-    
+    def add_middleware(self,middleware_cls):
+        self.middleware.add(middleware_cls)
+        
     def add_exception_handler(self,exception_handler):
         self.exception_handler = exception_handler
         
@@ -44,7 +47,11 @@ class API:
         
     def __call__(self, environ, start_response):
         print("CALLED __CALL__")
-        return self.whitenoise(environ, start_response)
+        path_info = environ["PATH_INFO"]
+        if path_info.startswith("/static"):
+            environ["PATH_INFO"] = path_info[len("/static"):]
+            return self.whitenoise(environ, start_response)
+        return self.middleware(environ, start_response)
     
     def wsgi_app(self, environ, start_response):
         request =Request(environ)
@@ -79,7 +86,7 @@ class API:
         try:
             if handler is not None:
                 if inspect.isclass(handler):
-                    handler_funtion = getattr(handler(),request.method.lower(),None)
+                    handler = getattr(handler(),request.method.lower(),None)
                     if handler is None:
                         raise AttributeError('Method is not allowed ',request.method.lower())             
                 handler(request,response,**kwargs)
