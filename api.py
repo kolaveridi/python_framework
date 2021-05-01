@@ -5,15 +5,22 @@ import colorama
 from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 import os
 from jinja2 import Environment, FileSystemLoader
+from whitenoise import WhiteNoise
 
 colorama.init()
 
 class API:
-    def __init__(self,templates_dir="templates"):
+    def __init__(self,templates_dir="templates", static_dir="static"):
         self.routes={}
+        self.exception_handler =None
         self.templates_env = Environment(loader =FileSystemLoader(os.path.abspath(templates_dir)))
+        self.whitenoise = WhiteNoise(self.wsgi_app, root=static_dir)
+        
         
     
+    def add_exception_handler(self,exception_handler):
+        self.exception_handler = exception_handler
+        
     def template(self,template_name,context=None):
         if context is None:
             context={}
@@ -37,11 +44,15 @@ class API:
         
     def __call__(self, environ, start_response):
         print("CALLED __CALL__")
+        return self.whitenoise(environ, start_response)
+    
+    def wsgi_app(self, environ, start_response):
         request =Request(environ)
         
         response =self.handle_request(request)
         
         return response(environ,start_response)
+        
     
     def default_response(self,response):
         response.status_code = 404
@@ -50,8 +61,11 @@ class API:
     
     def find_handler(self,request_path):
         for path,handler in self.routes.items():
+            print("path is ",path)
+            print("request_path is ",request_path)
             parse_result = parse(path,request_path)
             if parse_result is not None:
+                print("handler named ",handler, parse_result.named)
                 return handler,parse_result.named
             
         return None,None    
@@ -62,17 +76,21 @@ class API:
         print(colorama.Fore.RED,"request is  ",request)
         
         handler,kwargs = self.find_handler(request_path=request.path)
-        if handler is not None:
-            if inspect.isclass(handler):
-                handler_funtion = getattr(handler(),request.method.lower(),None)
-                if handler_funtion is None:
-                    raise AttributeError('Method is not allowed ',request.method.lower())
-                handler_funtion(request,response,**kwargs)
-                pass
+        try:
+            if handler is not None:
+                if inspect.isclass(handler):
+                    handler_funtion = getattr(handler(),request.method.lower(),None)
+                    if handler is None:
+                        raise AttributeError('Method is not allowed ',request.method.lower())             
+                handler(request,response,**kwargs)
             else:
-                handler(request,response ,**kwargs)
-        else:
-            self.default_response(response)       
+                self.default_response(response) 
+        except Exception as e:
+            if self.exception_handler is None:
+                print("raised")
+                raise e
+            else:
+                self.exception_handler(request, response, e)      
         return response   
     
     #test part
@@ -80,6 +98,8 @@ class API:
         session = RequestsSession()
         session.mount(prefix=base_url, adapter=RequestsWSGIAdapter(self))
         return session  
+    
+    
             
         
         

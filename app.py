@@ -1,5 +1,5 @@
 from api import API
-app = API()
+app = API(templates_dir="templates")
 
 @app.route("/home")
 def home (request,response):
@@ -37,3 +37,13 @@ def template_handler(req,resp):
         context={"name": "Bumbo", "title": "Best Framework"}
     ).encode()
     
+    
+def custom_exception_handler(request, response, exception_cls):
+    response.text = str(exception_cls)
+
+app.add_exception_handler(custom_exception_handler)    
+
+    
+@app.route("/exception")
+def exception_throwing_handler(request, response):
+    raise AssertionError("This handler should not be used.")    
